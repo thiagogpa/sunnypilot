@@ -352,6 +352,7 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   pcmCruiseSpeed @3 :Bool;
   intelligentCruiseButtonManagementAvailable @4 :Bool;
   enableGasInterceptor @5 :Bool;
+  subaruBrakeHoldTimer @6 :Int16;
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
 
