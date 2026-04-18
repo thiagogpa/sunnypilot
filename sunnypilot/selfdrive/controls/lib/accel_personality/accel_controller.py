@@ -13,30 +13,29 @@ from openpilot.common.params import Params
 AccelPersonality = custom.LongitudinalPlanSP.AccelerationPersonality
 ACCEL_PERSONALITY_OPTIONS = [AccelPersonality.eco, AccelPersonality.normal, AccelPersonality.sport]
 
-MAX_ACCEL_PROFILES = {
-  AccelPersonality.eco:    [2.00, 1.55, 1.10, 0.78, 0.56, 0.38, 0.24, 0.10, 0.05],
-  AccelPersonality.normal: [2.00, 1.65, 1.25, 0.95, 0.72, 0.52, 0.32, 0.13, 0.07],
-  AccelPersonality.sport:  [2.00, 1.80, 1.45, 1.15, 0.90, 0.68, 0.44, 0.18, 0.09],
+
+MAX_ACCEL_BP = [0.0, 3.0, 6.0, 10.0, 15.0, 22.0, 30.0, 40.0]  # m/s
+
+MAX_ACCEL_V = {
+  AccelPersonality.eco:    [2.00, 1.40, 1.00, 0.70, 0.48, 0.30, 0.15, 0.06],
+  AccelPersonality.normal: [2.00, 1.55, 1.15, 0.85, 0.60, 0.40, 0.20, 0.08],
+  AccelPersonality.sport:  [2.00, 1.75, 1.40, 1.08, 0.80, 0.55, 0.28, 0.10],
 }
-MAX_ACCEL_BREAKPOINTS = [0.0, 3.0, 5.0, 8.0, 12.0, 18.0, 24.0, 32.0, 42.0]
 
-# Cruise decel floor: base * exp(-decay * v_ego)
-MIN_ACCEL_BASE = {
-  AccelPersonality.eco:    -0.35,
-  AccelPersonality.normal: -0.55,
-  AccelPersonality.sport:  -0.90,
+MIN_ACCEL_BP = [0.0, 5.0, 10.0, 18.0, 28.0, 40.0]  # m/s
+
+MIN_ACCEL_V = {
+  AccelPersonality.eco:    [-0.10, -0.18, -0.28, -0.45, -0.65, -0.85],
+  AccelPersonality.normal: [-0.18, -0.30, -0.46, -0.70, -0.95, -1.20],
+  AccelPersonality.sport:  [-0.30, -0.50, -0.75, -1.10, -1.45, -1.80],
 }
-MIN_ACCEL_DECAY = 0.022  # smooth exponential fade with speed
 
-JERK_ACCEL = 0.50  # accel ceiling rate (m/s² per s)
 
-# Decel floor engagement: very slow — brake authority drifts in, no bite
-_DECEL_ON_BP = [0.0,  8.0,  18.0,  32.0]
-_DECEL_ON_V  = [0.20, 0.13,  0.08,  0.06]  # m/s² per s
+JERK_ACCEL_BP = [0.0,  8.0,  20.0,  35.0]   # m/s
+JERK_ACCEL_V  = [0.80, 0.55,  0.40,  0.30]   # m/s² per s
 
-# Decel floor release: slightly faster — lets MPC back off cleanly without trailing clamp
-_DECEL_OFF_BP = [0.0,  8.0,  18.0,  32.0]
-_DECEL_OFF_V  = [0.22, 0.16,  0.12,  0.09]  # m/s² per s
+JERK_DECEL_BP = [0.0,  8.0,  20.0,  35.0]   # m/s
+JERK_DECEL_V  = [0.60, 0.40,  0.28,  0.20]   # m/s² per s
 
 _MIN_MAX_GAP = 0.05
 
@@ -46,10 +45,10 @@ class AccelPersonalityController:
     self.params = Params()
     self.frame = 0
     self.first_run = True
-    self.last_max_accel = 2.0
-    self.last_min_accel = 0.0
+    self._last_max = 2.0
+    self._last_min = -0.18
     self._cache_v: float | None = None
-    self._cache_min: float = 0.0
+    self._cache_min: float = -0.18
     self._cache_max: float = 2.0
 
     val = self.params.get('AccelPersonality')
@@ -84,26 +83,24 @@ class AccelPersonalityController:
     return int(next_p)
 
   def _step(self, v_ego: float) -> tuple[float, float]:
-    target_max = float(np.interp(v_ego, MAX_ACCEL_BREAKPOINTS, MAX_ACCEL_PROFILES[self._accel_personality]))
-    target_min = float(MIN_ACCEL_BASE[self._accel_personality] * np.exp(-MIN_ACCEL_DECAY * v_ego))
+    target_max = float(np.interp(v_ego, MAX_ACCEL_BP, MAX_ACCEL_V[self._accel_personality]))
+    target_min = float(np.interp(v_ego, MIN_ACCEL_BP, MIN_ACCEL_V[self._accel_personality]))
 
     if self.first_run:
-      self.last_max_accel = target_max
-      self.last_min_accel = target_min
+      self._last_max = target_max
+      self._last_min = target_min
       self.first_run = False
       return target_min, target_max
 
-    a_step = JERK_ACCEL * DT_MDL
-    new_max = float(np.clip(target_max, self.last_max_accel - a_step, self.last_max_accel + a_step))
+    a_rate = float(np.interp(v_ego, JERK_ACCEL_BP, JERK_ACCEL_V)) * DT_MDL
+    d_rate = float(np.interp(v_ego, JERK_DECEL_BP, JERK_DECEL_V)) * DT_MDL
 
-    tightening = target_min < self.last_min_accel
-    d_rate = float(np.interp(v_ego, _DECEL_ON_BP, _DECEL_ON_V)) if tightening \
-         else float(np.interp(v_ego, _DECEL_OFF_BP, _DECEL_OFF_V))
-    new_min = float(np.clip(target_min, self.last_min_accel - d_rate * DT_MDL, self.last_min_accel + d_rate * DT_MDL))
+    new_max = float(np.clip(target_max, self._last_max - a_rate, self._last_max + a_rate))
+    new_min = float(np.clip(target_min, self._last_min - d_rate, self._last_min + d_rate))
     new_min = min(new_min, new_max - _MIN_MAX_GAP)
 
-    self.last_max_accel = new_max
-    self.last_min_accel = new_min
+    self._last_max = new_max
+    self._last_min = new_min
     return new_min, new_max
 
   def get_accel_limits(self, v_ego: float) -> tuple[float, float]:
@@ -136,7 +133,7 @@ class AccelPersonalityController:
     self._accel_personality = new_p
     self.params.put('AccelPersonality', new_p)
     self.frame = 0
-    self.last_max_accel = 2.0
-    self.last_min_accel = 0.0
+    self._last_max = 2.0
+    self._last_min = -0.18
     self._cache_v = None
     self.first_run = True

@@ -12,25 +12,19 @@ from openpilot.common.params import Params
 
 LongPersonality = log.LongitudinalPersonality
 
-FOLLOW_BREAKPOINTS =          [0.,   4.0,  6.0,  11.,  18.,  30.,  40.]
+FOLLOW_BREAKPOINTS = [0.,  4.0,  8.0,  14.,  22.,  32.,  40.]  # m/s
 
 FOLLOW_PROFILES = {
-  LongPersonality.relaxed:    [1.55, 1.60, 1.75, 1.78, 1.92, 1.84, 1.98],
-  LongPersonality.standard:   [1.25, 1.30, 1.48, 1.52, 1.62, 1.55, 1.65],
-  LongPersonality.aggressive: [1.05, 1.10, 1.28, 1.32, 1.42, 1.36, 1.45],
+  LongPersonality.relaxed:    [1.75, 1.80, 1.90, 1.95, 2.05, 1.95, 2.10],
+  LongPersonality.standard:   [1.45, 1.50, 1.58, 1.62, 1.70, 1.62, 1.72],
+  LongPersonality.aggressive: [1.20, 1.24, 1.30, 1.34, 1.40, 1.34, 1.42],
 }
 
-SMOOTHING_SPEED_REF = 36.0
-
-# Braking side (multiplier growing — lead slowing): very high inertia = glide-in feel
-_ALPHA_SLOW_BASE  = 0.975   # near-standstill
-_ALPHA_SLOW_RANGE = 0.012   # +range at highway → 0.987 max
-
-# Throttle side (multiplier shrinking — gap opening): faster so we don't dawdle on throttle
-_ALPHA_FAST_BASE  = 0.930
-_ALPHA_FAST_RANGE = 0.045   # → 0.975 at highway
-
-_ALPHA_MAX = 0.990
+ALPHA_HOLD     = 0.95   # normal following — high inertia
+ALPHA_SNAP     = 0.70   # emergency/large error — fast response
+ERROR_THRESHOLD = 0.15  # multiplier gap above which we blend toward ALPHA_SNAP
+SPEED_BOOST_BP  = [0.0,  36.0]   # m/s
+SPEED_BOOST_V   = [0.00,  0.02]  # additional alpha at highway (tiny extra smoothness)
 
 PERSONALITY_CHANGE_COOLDOWN_S = 2.0
 
@@ -48,13 +42,11 @@ class FollowDistanceController:
     self._enabled = self.params.get_bool('DynamicFollow')
 
   def _get_alpha(self, v_ego: float, target: float) -> float:
-    speed_frac = np.clip(v_ego / SMOOTHING_SPEED_REF, 0.0, 1.0)
-    increasing = target > self.current_multiplier
-    if increasing:
-      alpha = _ALPHA_SLOW_BASE + _ALPHA_SLOW_RANGE * speed_frac
-    else:
-      alpha = _ALPHA_FAST_BASE + _ALPHA_FAST_RANGE * speed_frac
-    return float(min(_ALPHA_MAX, alpha))
+    error = abs(target - self.current_multiplier)
+    blend = float(np.clip(error / ERROR_THRESHOLD, 0.0, 1.0))
+    alpha = ALPHA_HOLD * (1.0 - blend) + ALPHA_SNAP * blend
+    alpha += float(np.interp(v_ego, SPEED_BOOST_BP, SPEED_BOOST_V))
+    return float(min(0.97, alpha))
 
   def is_enabled(self) -> bool:
     return self._enabled

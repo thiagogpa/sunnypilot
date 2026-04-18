@@ -51,7 +51,14 @@ class LongitudinalPlannerSP:
 
   def get_accel_clip(self, v_ego: float) -> list[float] | None:
     if self.accel_controller.is_enabled():
-      return [ACCEL_MIN, self.accel_controller.get_max_accel(v_ego)]
+      # In acc mode (normal following/cruise) apply our soft decel floor so the
+      # output clip itself is smoothed. In blended/e2e mode keep full ACCEL_MIN
+      # so the e2e model retains emergency braking authority.
+      if self.dec.active() and self.dec.mode() == "blended":
+        min_accel = ACCEL_MIN
+      else:
+        min_accel = self.accel_controller.get_min_accel(v_ego)
+      return [min_accel, self.accel_controller.get_max_accel(v_ego)]
     return None
 
   def get_cruise_min_accel(self, v_ego: float) -> float | None:
