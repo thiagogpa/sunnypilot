@@ -119,6 +119,8 @@ def initialize_params(params) -> list[dict[str, Any]]:
 
   # subaru
   keys.extend([
+    "SubaruBrakeHold",
+    "SubaruBrakeHoldTimer",
     "SubaruStopAndGo",
     "SubaruStopAndGoManualParkingBrake",
   ])
