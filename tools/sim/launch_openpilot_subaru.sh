@@ -2,7 +2,11 @@
 
 SCRIPT_DIR=$(dirname "$0")
 OPENPILOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PYTHON="$OPENPILOT_DIR/.venv/bin/python3"
+if [ -f "$OPENPILOT_DIR/.venv/bin/python3" ]; then
+  PYTHON="$OPENPILOT_DIR/.venv/bin/python3"
+else
+  PYTHON="python3"
+fi
 
 export PASSIVE="0"
 export NOBOARD="1"
