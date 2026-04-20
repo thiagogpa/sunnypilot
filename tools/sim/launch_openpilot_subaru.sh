@@ -4,6 +4,8 @@ SCRIPT_DIR=$(dirname "$0")
 OPENPILOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 if [ -f "$OPENPILOT_DIR/.venv/bin/python3" ]; then
   PYTHON="$OPENPILOT_DIR/.venv/bin/python3"
+elif [ -f "/usr/local/venv/bin/python3" ]; then
+  PYTHON="/usr/local/venv/bin/python3"
 else
   PYTHON="python3"
 fi
