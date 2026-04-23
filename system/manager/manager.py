@@ -105,9 +105,10 @@ def manager_init() -> None:
                        dirty=build_metadata.openpilot.is_dirty,
                        device=HARDWARE.get_device_type())
 
-  # preimport all processes
-  for p in managed_processes.values():
-    p.prepare()
+  # preimport all processes (skip in simulation mode — many native extensions aren't built on Mac)
+  if not os.getenv("SIMULATION"):
+    for p in managed_processes.values():
+      p.prepare()
 
 
 def manager_cleanup() -> None:

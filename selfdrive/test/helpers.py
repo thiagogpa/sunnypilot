@@ -21,6 +21,8 @@ def set_params_enabled():
   params.put("HasAcceptedTerms", terms_version)
   params.put("CompletedTrainingVersion", training_version)
   params.put_bool("OpenpilotEnabledToggle", True)
+  params.put_bool("EnableDriverMonitoring", True)
+  params.put_bool("AlwaysOnDM", True)
 
   # valid calib
   msg = messaging.new_message('liveCalibration')

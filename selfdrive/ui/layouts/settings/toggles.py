@@ -32,7 +32,7 @@ DESCRIPTIONS = {
     "without a turn signal activated while driving over 31 mph (50 km/h)."
   ),
   "AlwaysOnDM": tr_noop("Enable driver monitoring even when sunnypilot is not engaged."),
-  "EnableDriverMonitoring": tr_noop("When enabled, the driver monitoring system will ensure the driver is paying attention. Disable this feature to turn off all driver awareness features."),
+  "EnableDriverMonitoring": tr_noop("The driver monitoring system ensures the driver is paying attention."),
   'RecordFront': tr_noop("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
