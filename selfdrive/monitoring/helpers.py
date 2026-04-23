@@ -334,6 +334,10 @@ class DriverMonitoring:
 
   def _update_events(self, driver_engaged, op_engaged, standstill, wrong_gear, car_speed):
     self._reset_events()
+    if not getattr(self, 'dm_enabled', True):
+      self._reset_awareness()
+      return
+
     # Block engaging until ignition cycle after max number or time of distractions
     if self.terminal_alert_cnt >= self.settings._MAX_TERMINAL_ALERTS or \
        self.terminal_time >= self.settings._MAX_TERMINAL_DURATION:
