@@ -214,6 +214,17 @@ class TestMonitoring:
     assert EventName.driverUnresponsive3 in \
                               events[int((INVISIBLE_SECONDS_TO_RED-1+DT_DMON*d_status.settings._HI_STD_FALLBACK_TIME+0.1)/DT_DMON)].names
 
+  # disabled driver monitoring should bypass all distraction logic
+  def test_disabled_driver_monitoring(self):
+    DM = DriverMonitoring()
+    DM.dm_enabled = False
+    events = []
+    for idx in range(len(always_distracted)):
+      DM._update_states(always_distracted[idx], [0, 0, 0], 0, always_true[idx], always_false[idx])
+      DM._update_events(always_false[idx], always_true[idx], always_false[idx], 0, 0)
+      events.append(DM.current_events)
+    self._assert_no_events(events)
+
 
 @pytest.mark.parametrize("enabled_state, lat_active_state, expected", [
   (False, False, False), # Both Disabled

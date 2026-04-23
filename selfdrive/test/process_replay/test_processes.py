@@ -160,7 +160,7 @@ if __name__ == "__main__":
   except FileNotFoundError:
     ref_commit = URLFile(BASE_URL + "ref_commit", cache=False).read().decode().strip()
 
-  cur_commit = get_commit()
+  cur_commit = get_commit() or "master"
   if not cur_commit:
     raise Exception("Couldn't get current commit")
 
@@ -172,43 +172,56 @@ if __name__ == "__main__":
     assert len(untested) == 0, f"Cars missing routes: {str(untested)}"
 
   log_paths: defaultdict[str, dict[str, dict[str, str]]] = defaultdict(lambda: defaultdict(dict))
-  with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
-    download_segments = [seg for car, seg in segments if car in tested_cars]
-    log_data: dict[str, LogReader] = {}
-    p1 = pool.map(get_log_data, download_segments)
-    for segment, lr in tqdm(p1, desc="Getting Logs", total=len(download_segments)):
+  download_segments = [seg for car, seg in segments if car in tested_cars]
+  log_data: dict[str, LogReader] = {}
+
+  if args.jobs > 1:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
+      p1 = pool.map(get_log_data, download_segments)
+      for segment, lr in tqdm(p1, desc="Getting Logs", total=len(download_segments)):
+        log_data[segment] = lr
+  else:
+    for segment in tqdm(download_segments, desc="Getting Logs"):
+      segment, lr = get_log_data(segment)
       log_data[segment] = lr
 
-    pool_args: Any = []
-    for car_brand, segment in segments:
-      if car_brand not in tested_cars:
+  pool_args: Any = []
+  for car_brand, segment in segments:
+    if car_brand not in tested_cars:
+      continue
+
+    for cfg in CONFIGS:
+      if cfg.proc_name not in tested_procs:
         continue
 
-      for cfg in CONFIGS:
-        if cfg.proc_name not in tested_procs:
-          continue
+      # to speed things up, we only test all segments on card
+      if cfg.proc_name not in ('card', 'controlsd', 'lagd') and car_brand not in ('HYUNDAI', 'TOYOTA'):
+        continue
 
-        # to speed things up, we only test all segments on card
-        if cfg.proc_name not in ('card', 'controlsd', 'lagd') and car_brand not in ('HYUNDAI', 'TOYOTA'):
-          continue
+      cur_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{cur_commit}.zst".replace("|", "_"))
+      if args.update_refs:  # reference logs will not exist if routes were just regenerated
+        route, seg_num = segment.rsplit("--", 1)
+        ref_log_path = get_url(route, seg_num, "rlog.zst")
+      else:
+        ref_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{ref_commit}.zst".replace("|", "_"))
+        ref_log_path = ref_log_fn if os.path.exists(ref_log_fn) else BASE_URL + os.path.basename(ref_log_fn)
 
-        cur_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{cur_commit}.zst".replace("|", "_"))
-        if args.update_refs:  # reference logs will not exist if routes were just regenerated
-          route, seg_num = segment.rsplit("--", 1)
-          ref_log_path = get_url(route, seg_num, "rlog.zst")
-        else:
-          ref_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{ref_commit}.zst".replace("|", "_"))
-          ref_log_path = ref_log_fn if os.path.exists(ref_log_fn) else BASE_URL + os.path.basename(ref_log_fn)
+      pool_args.append((segment, cfg, args, cur_log_fn, ref_log_path, log_data[segment]))
 
-        pool_args.append((segment, cfg, args, cur_log_fn, ref_log_path, log_data[segment]))
+      log_paths[segment][cfg.proc_name]['ref'] = ref_log_path
+      log_paths[segment][cfg.proc_name]['new'] = cur_log_fn
 
-        log_paths[segment][cfg.proc_name]['ref'] = ref_log_path
-        log_paths[segment][cfg.proc_name]['new'] = cur_log_fn
-
-    results: Any = defaultdict(dict)
-    diffs: list = []
-    p2 = pool.map(run_test_process, pool_args)
-    for (segment, proc, result, diff_data) in tqdm(p2, desc="Running Tests", total=len(pool_args)):
+  results: Any = defaultdict(dict)
+  diffs: list = []
+  if args.jobs > 1:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
+      p2 = pool.map(run_test_process, pool_args)
+      for (segment, proc, result, diff_data) in tqdm(p2, desc="Running Tests", total=len(pool_args)):
+        results[segment][proc] = result
+        diffs.append((segment, proc, diff_data))
+  else:
+    for data in tqdm(pool_args, desc="Running Tests"):
+      segment, proc, result, diff_data = run_test_process(data)
       results[segment][proc] = result
       diffs.append((segment, proc, diff_data))
 

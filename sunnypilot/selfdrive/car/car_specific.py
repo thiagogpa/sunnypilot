@@ -4,6 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+from __future__ import annotations
 
 from cereal import log, custom
 from opendbc.car import structs
@@ -24,7 +25,7 @@ class CarSpecificEventsSP:
 
     self.low_speed_alert = False
 
-  def update(self, CS: structs.CarState, events: Events):
+  def update(self, CS: structs.CarState, events: Events, CS_SP: custom.CarStateSP | None = None):
     events_sp = EventsSP()
 
     if self.CP.brand == 'chrysler':
@@ -47,5 +48,9 @@ class CarSpecificEventsSP:
         if CS.cruiseState.standstill and not CS.brakePressed and self.CP_SP.enableGasInterceptor:
           if events.has(EventName.resumeRequired):
             events.remove(EventName.resumeRequired)
+
+    elif self.CP.brand == 'subaru':
+      if CS_SP is not None and CS_SP.brakeHoldDrift:
+        events_sp.add(EventNameSP.brakeHoldDrift)
 
     return events_sp

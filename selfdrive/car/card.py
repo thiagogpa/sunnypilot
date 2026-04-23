@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import os
 import time
 import threading
@@ -196,6 +198,9 @@ class Car:
 
     # Update carState from CAN
     CS, CS_SP = self.CI.update(can_list)
+    # Inject brake hold drift flag from previous controller frame (1-frame delay is acceptable)
+    if hasattr(self.CI.CC, 'brake_hold'):
+      CS_SP.brakeHoldDrift = self.CI.CC.brake_hold.drift_detected
     CS_SP = convert_to_capnp(CS_SP)
 
     # Update radar tracks from CAN

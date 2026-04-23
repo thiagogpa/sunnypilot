@@ -15,6 +15,10 @@
     "title": "Always-on Driver Monitor",
     "description": ""
   },
+  "EnableDriverMonitoring": {
+    "title": "Enable Driver Monitoring",
+    "description": "When enabled, the driver monitoring system will ensure the driver is paying attention. Disable this feature to turn off all driver awareness features."
+  },
   "ApiCache_Device": {
     "title": "Api Cache  Device",
     "description": ""

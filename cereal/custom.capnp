@@ -342,6 +342,7 @@ struct OnroadEventSP @0xda96579883444c35 {
     speedLimitChanged @21;
     speedLimitPending @22;
     e2eChime @23;
+    brakeHoldDrift @24;
   }
 }
 
@@ -351,6 +352,7 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   pcmCruiseSpeed @3 :Bool;
   intelligentCruiseButtonManagementAvailable @4 :Bool;
   enableGasInterceptor @5 :Bool;
+  subaruBrakeHoldTimer @6 :Int16;
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
 
@@ -435,6 +437,7 @@ struct BackupManagerSP @0xf98d843bfd7004a3 {
 
 struct CarStateSP @0xb86e6369214c01c8 {
   speedLimit @0 :Float32;
+  brakeHoldDrift @1 :Bool;
 }
 
 struct LiveMapDataSP @0xf416ec09499d9d19 {

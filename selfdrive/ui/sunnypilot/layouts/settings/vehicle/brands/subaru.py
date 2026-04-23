@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.vehicle.brands.base import BrandSettings
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp
 from opendbc.car.subaru.values import CAR, SubaruFlags
 
 
@@ -21,7 +21,19 @@ class SubaruSettings(BrandSettings):
     self.stop_and_go_manual_parking_brake_toggle = toggle_item_sp(tr("Stop and Go for Manual Parking Brake (Beta)"), "",
                                                                   param="SubaruStopAndGoManualParkingBrake", callback=self._on_toggle_changed)
 
-    self.items = [self.stop_and_go_toggle, self.stop_and_go_manual_parking_brake_toggle]
+    self.brake_hold_toggle = toggle_item_sp(tr("Brake Hold (Beta)"), "", param="SubaruBrakeHold", callback=self._on_toggle_changed)
+
+    self.brake_hold_timer = option_item_sp(
+      title=tr("Brake Hold Timer"),
+      param="SubaruBrakeHoldTimer",
+      min_value=0,
+      max_value=10,
+      value_change_step=1,
+      label_callback=lambda x: tr("Instant") if x == 0 else f"{x} s",
+    )
+
+    self.items = [self.stop_and_go_toggle, self.stop_and_go_manual_parking_brake_toggle,
+                  self.brake_hold_toggle, self.brake_hold_timer]
 
   def _on_toggle_changed(self, _):
     self.update_settings()
@@ -38,9 +50,9 @@ class SubaruSettings(BrandSettings):
     if bundle:
       platform = bundle.get("platform")
       config = CAR[platform].config
-      self.has_stop_and_go = not (config.flags & (SubaruFlags.GLOBAL_GEN2 | SubaruFlags.HYBRID))
+      self.has_stop_and_go = not (config.flags & SubaruFlags.HYBRID)
     elif ui_state.CP is not None:
-      self.has_stop_and_go = not (ui_state.CP.flags & (SubaruFlags.GLOBAL_GEN2 | SubaruFlags.HYBRID))
+      self.has_stop_and_go = not (ui_state.CP.flags & SubaruFlags.HYBRID)
 
     disabled_msg = self.stop_and_go_disabled_msg()
     descriptions = [
@@ -52,3 +64,14 @@ class SubaruSettings(BrandSettings):
     for toggle, desc in zip([self.stop_and_go_toggle, self.stop_and_go_manual_parking_brake_toggle], descriptions, strict=True):
       toggle.action_item.set_enabled(self.has_stop_and_go and ui_state.is_offroad())
       toggle.set_description(f"<b>{disabled_msg}</b><br><br>{desc}" if disabled_msg else desc)
+
+    brake_hold_desc = tr("Experimental feature to automatically hold brakes at standstill for Subaru vehicles with manual parking brake. " +
+                         "Sends sustained brake commands after ACC disengages to prevent rolling.")
+    self.brake_hold_toggle.action_item.set_enabled(self.has_stop_and_go and ui_state.is_offroad())
+    self.brake_hold_toggle.set_description(f"<b>{disabled_msg}</b><br><br>{brake_hold_desc}" if disabled_msg else brake_hold_desc)
+
+    brake_hold_on = ui_state.params.get_bool("SubaruBrakeHold")
+    timer_desc = tr("Set the delay in seconds before auto-hold activates at standstill. \"Instant\" means hold begins immediately upon stopping.")
+    self.brake_hold_timer.action_item.set_enabled(self.has_stop_and_go and ui_state.is_offroad())
+    self.brake_hold_timer.set_description(timer_desc)
+    self.brake_hold_timer.set_visible(brake_hold_on)

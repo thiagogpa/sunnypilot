@@ -27,6 +27,9 @@ def get_nn_model_path(CP: structs.CarParams) -> tuple[str, str, bool]:
   def check_nn_path(_nn_candidate):
     _model_path = None
     _max_similarity = -1.0
+    if not os.path.exists(TORQUE_NN_MODEL_PATH):
+      return MOCK_MODEL_PATH, 1.0
+
     for f in os.listdir(TORQUE_NN_MODEL_PATH):
       if f.endswith(".json"):
         model = os.path.splitext(f)[0]

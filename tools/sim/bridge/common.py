@@ -1,3 +1,4 @@
+import os
 import signal
 import threading
 import functools
@@ -15,6 +16,13 @@ from openpilot.selfdrive.test.helpers import set_params_enabled
 from openpilot.tools.sim.lib.common import SimulatorState, World
 from openpilot.tools.sim.lib.simulated_car import SimulatedCar
 from openpilot.tools.sim.lib.simulated_sensors import SimulatedSensors
+
+
+def _make_simulated_car():
+  if os.environ.get('FINGERPRINT', '').startswith('SUBARU'):
+    from openpilot.tools.sim.lib.simulated_subaru_car import SimulatedSubaruCar
+    return SimulatedSubaruCar()
+  return SimulatedCar()
 
 QueueMessage = namedtuple("QueueMessage", ["type", "info"], defaults=[None])
 
@@ -101,7 +109,7 @@ Ignition: {self.simulator_state.ignition} Engaged: {self.simulator_state.is_enga
   def _run(self, q: Queue):
     self.world = self.spawn_world(q)
 
-    self.simulated_car = SimulatedCar()
+    self.simulated_car = _make_simulated_car()
     self.simulated_sensors = SimulatedSensors(self.dual_camera)
 
     self._exit_event = threading.Event()
