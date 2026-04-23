@@ -85,5 +85,8 @@ class TogglesLayoutMici(NavScroller):
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
-      item.set_checked(ui_state.params.get_bool(key))
-t_checked(ui_state.params.get_bool(key))
+      try:
+        item.set_checked(ui_state.params.get_bool(key))
+      except Exception:
+        pass
+

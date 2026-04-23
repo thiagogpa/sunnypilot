@@ -208,7 +208,10 @@ class TogglesLayout(Widget):
     # TODO: make a param control list item so we don't need to manage internal state as much here
     # refresh toggles from params to mirror external changes
     for param in self._toggle_defs:
-      self._toggles[param].action_item.set_state(self._params.get_bool(param))
+      try:
+        self._toggles[param].action_item.set_state(self._params.get_bool(param))
+      except UnknownKeyName:
+        pass
 
     # these toggles need restart, block while engaged
     for toggle_def in self._toggle_defs:
@@ -253,4 +256,6 @@ class TogglesLayout(Widget):
 
   def _set_longitudinal_personality(self, button_index: int):
     self._params.put("LongitudinalPersonality", button_index)
+
+nality", button_index)
 
