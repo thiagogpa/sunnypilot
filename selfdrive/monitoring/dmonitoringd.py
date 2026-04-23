@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import cereal.messaging as messaging
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.realtime import config_realtime_process
 from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
 
@@ -14,7 +14,10 @@ def dmonitoringd_thread():
                             'carControl'], poll='driverStateV2')
 
   DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"))
-  DM.dm_enabled = params.get_bool("EnableDriverMonitoring")
+  try:
+    DM.dm_enabled = params.get_bool("EnableDriverMonitoring")
+  except UnknownKeyName:
+    DM.dm_enabled = True
   demo_mode=False
 
   # 20Hz <- dmonitoringmodeld
@@ -55,4 +58,3 @@ def main():
 
 if __name__ == '__main__':
   main()
-n()
