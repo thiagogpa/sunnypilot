@@ -104,6 +104,10 @@ class SelfdriveD(CruiseHelper):
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
 
+    self.dm_enabled = self.params.get_bool("EnableDriverMonitoring")
+    self.original_ignore_alive = list(ignore)
+    self.original_ignore_valid = list(ignore)
+
     # read params
     self.is_metric = self.params.get_bool("IsMetric")
     self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
@@ -596,6 +600,7 @@ class SelfdriveD(CruiseHelper):
     while not evt.is_set():
       self.is_metric = self.params.get_bool("IsMetric")
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
+      self.dm_enabled = self.params.get_bool("EnableDriverMonitoring")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
       self.personality = self.params.get("LongitudinalPersonality", return_default=True)
