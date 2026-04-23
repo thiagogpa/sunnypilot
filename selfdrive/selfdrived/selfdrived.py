@@ -177,11 +177,27 @@ class SelfdriveD(CruiseHelper):
 
     CruiseHelper.__init__(self, self.CP)
 
+  def update_dm_checks(self):
+    dm_packets = ['driverMonitoringState', 'driverCameraState']
+    for p in dm_packets:
+      if not self.dm_enabled:
+        if p not in self.sm.ignore_alive:
+          self.sm.ignore_alive.append(p)
+        if p not in self.sm.ignore_valid:
+          self.sm.ignore_valid.append(p)
+      else:
+        if p in self.sm.ignore_alive and p not in self.original_ignore_alive:
+          self.sm.ignore_alive.remove(p)
+        if p in self.sm.ignore_valid and p not in self.original_ignore_valid:
+          self.sm.ignore_valid.remove(p)
+
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
 
     self.events.clear()
     self.events_sp.clear()
+
+    self.update_dm_checks()
 
     if self.sm['controlsState'].lateralControlState.which() == 'debugState':
       self.events.add(EventName.joystickDebug)
@@ -351,9 +367,10 @@ class SelfdriveD(CruiseHelper):
       self.events.add(EventName.processNotRunning)
     else:
       if not SIMULATION and not self.rk.lagging:
-        if not self.sm.all_alive(self.camera_packets):
+        active_camera_packets = [p for p in self.camera_packets if p != 'driverCameraState' or self.dm_enabled]
+        if not self.sm.all_alive(active_camera_packets):
           self.events.add(EventName.cameraMalfunction)
-        elif not self.sm.all_freq_ok(self.camera_packets):
+        elif not self.sm.all_freq_ok(active_camera_packets):
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:
       self.events.add(EventName.selfdrivedLagging)
