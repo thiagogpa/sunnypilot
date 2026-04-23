@@ -39,6 +39,7 @@ class TogglesLayoutMici(NavScroller):
       ("IsMetric", is_metric_toggle),
       ("IsLdwEnabled", ldw_toggle),
       ("AlwaysOnDM", always_on_dm_toggle),
+      ("EnableDriverMonitoring", enable_driver_monitoring_toggle),
       ("RecordFront", record_front),
       ("RecordAudio", record_mic),
       ("OpenpilotEnabledToggle", enable_openpilot),
@@ -85,3 +86,4 @@ class TogglesLayoutMici(NavScroller):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+t_checked(ui_state.params.get_bool(key))
