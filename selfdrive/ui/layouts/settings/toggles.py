@@ -76,6 +76,12 @@ class TogglesLayout(Widget):
         "monitoring.png",
         False,
       ),
+      "EnableDriverMonitoring": (
+        lambda: tr("Enable Driver Monitoring"),
+        DESCRIPTIONS["EnableDriverMonitoring"],
+        "monitoring.png",
+        False,
+      ),
       "RecordFront": (
         lambda: tr("Record and Upload Driver Camera"),
         DESCRIPTIONS["RecordFront"],
@@ -247,3 +253,4 @@ class TogglesLayout(Widget):
 
   def _set_longitudinal_personality(self, button_index: int):
     self._params.put("LongitudinalPersonality", button_index)
+ton_index)
