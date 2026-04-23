@@ -256,6 +256,14 @@ class DriverMonitoring:
     return distracted_types
 
   def _update_states(self, driver_state, cal_rpy, car_speed, op_engaged, standstill, demo_mode=False, steering_angle_deg=0.):
+    if not getattr(self, 'dm_enabled', True):
+      self.face_detected = True
+      self.driver_distracted = False
+      self.active_monitoring_mode = True
+      self.is_model_uncertain = False
+      self.hi_stds = 0
+      return
+
     rhd_pred = driver_state.wheelOnRightProb
     # calibrates only when there's movement and either face detected
     if car_speed > self.settings._WHEELPOS_CALIB_MIN_SPEED and (driver_state.leftDriverData.faceProb > self.settings._FACE_THRESHOLD or
