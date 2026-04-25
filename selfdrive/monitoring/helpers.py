@@ -167,6 +167,8 @@ class DriverMonitoring:
     self.dcam_uncertain_alerted = False # once per drive
     self.dcam_reset_cnt = 0
 
+    self.dm_enabled = True
+
     self.params = Params()
     self.too_distracted = self.params.get_bool("DriverTooDistracted")
 
@@ -256,7 +258,7 @@ class DriverMonitoring:
     return distracted_types
 
   def _update_states(self, driver_state, cal_rpy, car_speed, op_engaged, standstill, demo_mode=False, steering_angle_deg=0.):
-    if not getattr(self, 'dm_enabled', True):
+    if not self.dm_enabled:
       self.face_detected = True
       self.driver_distracted = False
       self.active_monitoring_mode = True
@@ -334,7 +336,7 @@ class DriverMonitoring:
 
   def _update_events(self, driver_engaged, op_engaged, standstill, wrong_gear, car_speed):
     self._reset_events()
-    if not getattr(self, 'dm_enabled', True):
+    if not self.dm_enabled:
       self._reset_awareness()
       return
 
