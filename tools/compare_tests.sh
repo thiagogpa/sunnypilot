@@ -48,6 +48,32 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Symlink compiled Cython extensions from the main repo into a worktree.
+# Worktrees don't have build artifacts; the .so files are identical across
+# these close commits so symlinking is safe and avoids a full scons rebuild.
+link_extensions() {
+  local worktree="$1"
+  local so_paths=(
+    "common/params_pyx.so"
+    "msgq_repo/msgq/ipc_pyx.so"
+    "msgq_repo/msgq/ipc_pyx.cpython-312-darwin.so"
+    "msgq_repo/msgq/visionipc/visionipc_pyx.so"
+    "msgq_repo/msgq/visionipc/visionipc_pyx.cpython-312-darwin.so"
+    "rednose_repo/rednose/helpers/ekf_sym_pyx.so"
+    "rednose_repo/rednose/helpers/ekf_sym_pyx.cpython-312-darwin.so"
+    "selfdrive/controls/lib/lateral_mpc_lib/c_generated_code/acados_ocp_solver_pyx.so"
+    "selfdrive/controls/lib/longitudinal_mpc_lib/c_generated_code/acados_ocp_solver_pyx.so"
+  )
+  for rel in "${so_paths[@]}"; do
+    src="$REPO_ROOT/$rel"
+    dst="$worktree/$rel"
+    if [[ -f "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      ln -sf "$src" "$dst"
+    fi
+  done
+}
+
 mkdir -p "$RESULTS_DIR"
 
 # ── Baseline worktree ────────────────────────────────────────────────────────
@@ -57,6 +83,9 @@ git -C "$REPO_ROOT" worktree add "$BASELINE_DIR" "$BASELINE_COMMIT"
 
 echo "==> Initialising submodules in baseline"
 git -C "$BASELINE_DIR" submodule update --init --recursive
+
+echo "==> Linking compiled extensions to baseline worktree"
+link_extensions "$BASELINE_DIR"
 
 echo "==> Running tests in baseline"
 cd "$BASELINE_DIR"
@@ -74,7 +103,16 @@ git -C "$REPO_ROOT" worktree remove --force "$LATEST_DIR" 2>/dev/null || true
 git -C "$REPO_ROOT" worktree add "$LATEST_DIR" "$LATEST_COMMIT"
 
 echo "==> Initialising submodules in latest"
-git -C "$LATEST_DIR" submodule update --init --recursive
+# Init writes .git/config entries without fetching
+git -C "$LATEST_DIR" submodule init
+# Override opendbc_repo URL to use local copy — the latest commit may not be
+# pushed to the remote yet, but the objects are in the local repo.
+git -C "$LATEST_DIR" config submodule.opendbc_repo.url "file://$REPO_ROOT/opendbc_repo/.git"
+# Update all submodules (opendbc_repo clones from local, others from remote)
+git -C "$LATEST_DIR" submodule update --recursive
+
+echo "==> Linking compiled extensions to latest worktree"
+link_extensions "$LATEST_DIR"
 
 echo "==> Running tests in latest"
 cd "$LATEST_DIR"
