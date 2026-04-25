@@ -95,3 +95,4 @@ SKILL.md
 !.idea/tools/*
 !.run/*
 .worktrees/
+tools/test_results/*.xml
