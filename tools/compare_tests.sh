@@ -4,11 +4,13 @@
 # Creates two git worktrees (baseline and latest), runs pytest with --junit-xml
 # in each, then calls diff_test_results.py to print a markdown comparison report.
 #
-# Usage: bash tools/compare_tests.sh
+# Usage: bash tools/compare_tests.sh [--force-baseline]
+#   --force-baseline  Re-run baseline even if tools/test_results/baseline.xml exists
 set -euo pipefail
 
 BASELINE_COMMIT="18406e77ee"
 LATEST_COMMIT="c6d5d89ea7"
+FORCE_BASELINE="${1:-}"
 
 REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 TOOLS_DIR="$REPO_ROOT/tools"
@@ -20,8 +22,11 @@ LATEST_DIR="$WORKTREE_BASE/latest"
 BASELINE_XML="$RESULTS_DIR/baseline.xml"
 LATEST_XML="$RESULTS_DIR/latest.xml"
 
-# Same exclusions as run_all_tests_summary.py
-DESELECT=(
+# Same exclusions as run_all_tests_summary.py, plus -k to exclude ALL parametrized
+# variants of test_panda_safety_carstate_fuzzy (--deselect only matches the base class).
+PYTEST_ARGS=(
+  -v -n auto --dist loadgroup
+  -k "not test_panda_safety_carstate_fuzzy"
   --deselect "selfdrive/controls/tests/test_leads.py"
   --deselect "selfdrive/locationd/test/test_locationd_scenarios.py"
   --deselect "common/tests/test_file_helpers.py::test_read_file"
@@ -37,7 +42,6 @@ DESELECT=(
   --deselect "cereal/messaging/tests/test_pub_sub_master.py::TestSubMaster::test_update_timeout"
   --deselect "selfdrive/test/longitudinal_maneuvers/test_longitudinal.py"
   --deselect "system/athena/tests/test_athenad.py::TestAthenadMethods::test_start_local_proxy"
-  --deselect "selfdrive/car/tests/test_models.py::TestCarModelBase::test_panda_safety_carstate_fuzzy"
 )
 
 cleanup() {
@@ -77,24 +81,28 @@ link_extensions() {
 mkdir -p "$RESULTS_DIR"
 
 # ── Baseline worktree ────────────────────────────────────────────────────────
-echo "==> Creating baseline worktree at $BASELINE_COMMIT"
-git -C "$REPO_ROOT" worktree remove --force "$BASELINE_DIR" 2>/dev/null || true
-git -C "$REPO_ROOT" worktree add "$BASELINE_DIR" "$BASELINE_COMMIT"
+if [[ -f "$BASELINE_XML" && "$FORCE_BASELINE" != "--force-baseline" ]]; then
+  echo "==> Skipping baseline run (XML exists). Pass --force-baseline to re-run."
+else
+  echo "==> Creating baseline worktree at $BASELINE_COMMIT"
+  git -C "$REPO_ROOT" worktree remove --force "$BASELINE_DIR" 2>/dev/null || true
+  git -C "$REPO_ROOT" worktree add "$BASELINE_DIR" "$BASELINE_COMMIT"
 
-echo "==> Initialising submodules in baseline"
-git -C "$BASELINE_DIR" submodule update --init --recursive
+  echo "==> Initialising submodules in baseline"
+  git -C "$BASELINE_DIR" submodule update --init --recursive
 
-echo "==> Linking compiled extensions to baseline worktree"
-link_extensions "$BASELINE_DIR"
+  echo "==> Linking compiled extensions to baseline worktree"
+  link_extensions "$BASELINE_DIR"
 
-echo "==> Running tests in baseline"
-cd "$BASELINE_DIR"
-set +e
-"$REPO_ROOT/.venv/bin/python" -m pytest -v -n auto --dist loadgroup \
-  --junit-xml="$BASELINE_XML" \
-  "${DESELECT[@]}"
-set -e
-cd "$REPO_ROOT"
+  echo "==> Running tests in baseline"
+  cd "$BASELINE_DIR"
+  set +e
+  "$REPO_ROOT/.venv/bin/python" -m pytest \
+    --junit-xml="$BASELINE_XML" \
+    "${PYTEST_ARGS[@]}"
+  set -e
+  cd "$REPO_ROOT"
+fi
 
 # ── Latest worktree ──────────────────────────────────────────────────────────
 echo ""
@@ -102,14 +110,14 @@ echo "==> Creating latest worktree at $LATEST_COMMIT"
 git -C "$REPO_ROOT" worktree remove --force "$LATEST_DIR" 2>/dev/null || true
 git -C "$REPO_ROOT" worktree add "$LATEST_DIR" "$LATEST_COMMIT"
 
-echo "==> Initialising submodules in latest"
-# Init writes .git/config entries without fetching
-git -C "$LATEST_DIR" submodule init
-# Override opendbc_repo URL to use local copy — the latest commit may not be
-# pushed to the remote yet, but the objects are in the local repo.
-git -C "$LATEST_DIR" config submodule.opendbc_repo.url "file://$REPO_ROOT/opendbc_repo/.git"
-# Update all submodules (opendbc_repo clones from local, others from remote)
-git -C "$LATEST_DIR" submodule update --recursive
+echo "==> Initialising submodules in latest (except opendbc_repo)"
+# Explicitly list submodules to avoid the opendbc_repo fetch — that commit is
+# local-only (not pushed to remote). opendbc_repo is cloned from local below.
+git -C "$LATEST_DIR" submodule update --init --recursive -- \
+  msgq_repo panda rednose_repo "sunnypilot/neural_network_data" teleoprtc_repo tinygrad_repo
+
+echo "==> Cloning opendbc_repo from local (commit not pushed to remote)"
+git clone --local "$REPO_ROOT/opendbc_repo" "$LATEST_DIR/opendbc_repo"
 
 echo "==> Linking compiled extensions to latest worktree"
 link_extensions "$LATEST_DIR"
@@ -117,9 +125,9 @@ link_extensions "$LATEST_DIR"
 echo "==> Running tests in latest"
 cd "$LATEST_DIR"
 set +e
-"$REPO_ROOT/.venv/bin/python" -m pytest -v -n auto --dist loadgroup \
+"$REPO_ROOT/.venv/bin/python" -m pytest \
   --junit-xml="$LATEST_XML" \
-  "${DESELECT[@]}"
+  "${PYTEST_ARGS[@]}"
 set -e
 cd "$REPO_ROOT"
 
