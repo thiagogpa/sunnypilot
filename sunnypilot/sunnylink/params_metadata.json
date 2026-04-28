@@ -15,10 +15,6 @@
     "title": "Always-on Driver Monitor",
     "description": ""
   },
-  "EnableDriverMonitoring": {
-    "title": "Enable Driver Monitoring",
-    "description": "When enabled, the driver monitoring system will ensure the driver is paying attention. Disable this feature to turn off all driver awareness features."
-  },
   "ApiCache_Device": {
     "title": "Api Cache  Device",
     "description": ""
@@ -285,6 +281,10 @@
   "EnableCopyparty": {
     "title": "copyparty Service",
     "description": ""
+  },
+  "EnableDriverMonitoring": {
+    "title": "Enable Driver Monitoring",
+    "description": "When enabled, the driver monitoring system will ensure the driver is paying attention. Disable this feature to turn off all driver awareness features."
   },
   "EnableGithubRunner": {
     "title": "GitHub Runner Service",
@@ -1238,6 +1238,14 @@
   "StandstillTimer": {
     "title": "[TIZI/TICI only] Standstill Timer",
     "description": "Show a timer on the HUD when the car is at a standstill."
+  },
+  "SubaruBrakeHold": {
+    "title": "Subaru Brake Hold",
+    "description": "Enable Subaru's Brake Hold feature to hold the vehicle stationary after it stops."
+  },
+  "SubaruBrakeHoldTimer": {
+    "title": "Subaru Brake Hold Timer",
+    "description": "Adjust the duration for which Subaru's Brake Hold feature remains active."
   },
   "SubaruStopAndGo": {
     "title": "Subaru Stop and Go",

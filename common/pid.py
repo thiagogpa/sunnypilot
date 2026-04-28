@@ -3,9 +3,9 @@ from numbers import Number
 
 class PIDController:
   def __init__(self, k_p, k_i, k_d=0., pos_limit=1e308, neg_limit=-1e308, rate=100):
-    self._k_p: list[list[float]] = [[0], [k_p]] if isinstance(k_p, Number) else k_p
-    self._k_i: list[list[float]] = [[0], [k_i]] if isinstance(k_i, Number) else k_i
-    self._k_d: list[list[float]] = [[0], [k_d]] if isinstance(k_d, Number) else k_d
+    self._k_p = np.array([[0], [k_p]]) if isinstance(k_p, Number) else np.array(k_p)
+    self._k_i = np.array([[0], [k_i]]) if isinstance(k_i, Number) else np.array(k_i)
+    self._k_d = np.array([[0], [k_d]]) if isinstance(k_d, Number) else np.array(k_d)
 
     self.set_limits(pos_limit, neg_limit)
 
