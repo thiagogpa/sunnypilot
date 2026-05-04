@@ -1,3 +1,4 @@
+COMPILE.md
 venv/
 .venv/
 .ci_cache
@@ -84,6 +85,7 @@ build/
 !.vscode/*.code-snippets
 
 # agents
+.agents/
 .claude/
 .context/
 PLAN.md
@@ -91,7 +93,23 @@ TASK.md
 CLAUDE.md
 SKILL.md
 
+# local session files
+DOCS-IMPLEMENTED.md
+FIX-DMON-CORRUPTION.md
+FIX-OPENDBC-CORRUPTION.md
+GEMINI.md
+INITIAL-PLAN.md
+MODELS.md
+SYNC.md
+TESTING-metadrive.md
+TODO.md
+run_all_tests_summary.py
+skills-lock.json
+tools/test_results/
+DOCS-INITIAL-PLAN.md
+
 ### JetBrains ###
 !.idea/customTargets.xml
 !.idea/tools/*
 !.run/*
+logs/
