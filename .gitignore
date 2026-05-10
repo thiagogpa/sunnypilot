@@ -87,26 +87,20 @@ build/
 # agents
 .agents/
 .claude/
+.gemini/
 .context/
 PLAN.md
 TASK.md
 CLAUDE.md
 SKILL.md
+GEMINI.md
 
 # local session files
-DOCS-IMPLEMENTED.md
-FIX-DMON-CORRUPTION.md
-FIX-OPENDBC-CORRUPTION.md
-GEMINI.md
-INITIAL-PLAN.md
-MODELS.md
-SYNC.md
-TESTING-metadrive.md
-TODO.md
 run_all_tests_summary.py
 skills-lock.json
 tools/test_results/
-DOCS-INITIAL-PLAN.md
+docs/superpowers/
+temp/
 
 ### JetBrains ###
 !.idea/customTargets.xml
