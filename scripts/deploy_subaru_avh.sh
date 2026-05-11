@@ -74,9 +74,24 @@ ssh "$DEVICE" "echo -n 1 > /data/params/d/DoReboot"
 
 echo "  Reboot triggered."
 
-# ── 7. wait for device to come back online ────────────────────────────────────
+# ── 7. wait for device to go offline (reboot started) ────────────────────────
+echo "=== Waiting for device to go offline ==="
+OFFLINE_TIMEOUT=60
+ELAPSED=0
+while ssh -o ConnectTimeout=3 -o BatchMode=yes "$DEVICE" true 2>/dev/null; do
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
+  if [[ $ELAPSED -ge $OFFLINE_TIMEOUT ]]; then
+    echo "  WARNING: Device did not go offline within ${OFFLINE_TIMEOUT}s — reboot may have stalled"
+    break
+  fi
+  printf "  waiting for offline... (%ds)\r" "$ELAPSED"
+done
+echo "  Device offline (${ELAPSED}s)."
+
+# ── 8. wait for device to come back online ────────────────────────────────────
 echo "=== Waiting for device to come back online ==="
-BOOT_TIMEOUT=180
+BOOT_TIMEOUT=240
 ELAPSED=0
 until ssh -o ConnectTimeout=5 -o BatchMode=yes "$DEVICE" true 2>/dev/null; do
   sleep 5
@@ -85,45 +100,17 @@ until ssh -o ConnectTimeout=5 -o BatchMode=yes "$DEVICE" true 2>/dev/null; do
     echo "ERROR: Device did not come back within ${BOOT_TIMEOUT}s"
     exit 1
   fi
-  printf "  waiting... (%ds)\r" "$ELAPSED"
+  printf "  waiting for online... (%ds)\r" "$ELAPSED"
 done
 echo "  Device is back online (${ELAPSED}s)."
 
-# ── 8. verify firmware file persisted through reboot ──────────────────────────
+# ── 9. verify firmware binary and panda chip post-reboot ─────────────────────
 echo "=== Verifying firmware file post-reboot ==="
 remote_fw_hash=$(ssh "$DEVICE" "md5sum /data/openpilot/$PANDA_BIN" | awk '{print $1}')
 if [[ "$EXPECTED_FW_HASH" == "$remote_fw_hash" ]]; then
-  echo "  OK  firmware binary intact on device"
+  echo "  OK  firmware binary intact on device ($remote_fw_hash)"
 else
   echo "  FAIL firmware binary changed after reboot (expected=$EXPECTED_FW_HASH got=$remote_fw_hash)"
-  exit 1
-fi
-
-# ── 9. verify panda hardware firmware via binary md5 ─────────────────────────
-# Compare the signed firmware binary on the device against our local build.
-# Waits up to 4 minutes for SSH to be available after reboot before checking.
-echo "=== Verifying panda hardware firmware ==="
-echo "  Waiting for SSH to be available (timeout 240s)..."
-PANDA_TIMEOUT=240
-ELAPSED=0
-until ssh -o ConnectTimeout=5 -o BatchMode=yes "$DEVICE" true 2>/dev/null; do
-  sleep 5
-  ELAPSED=$((ELAPSED + 5))
-  if [[ $ELAPSED -ge $PANDA_TIMEOUT ]]; then
-    echo "  WARNING: SSH not available within ${PANDA_TIMEOUT}s — cannot verify panda firmware"
-    echo "=== Deploy complete (panda firmware check skipped) ==="
-    exit 0
-  fi
-  printf "  waiting for SSH... (%ds)\r" "$ELAPSED"
-done
-
-REMOTE_FW_HASH=$(ssh "$DEVICE" "md5sum /data/openpilot/$PANDA_BIN" | awk '{print $1}')
-if [[ "$EXPECTED_FW_HASH" == "$REMOTE_FW_HASH" ]]; then
-  echo "  OK  panda firmware binary matches local build ($REMOTE_FW_HASH)"
-else
-  echo "  FAIL panda firmware binary mismatch"
-  echo "       expected: $EXPECTED_FW_HASH"
-  echo "       actual:   $REMOTE_FW_HASH"
   exit 1
 fi
 
