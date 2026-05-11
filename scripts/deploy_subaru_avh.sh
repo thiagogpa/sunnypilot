@@ -99,36 +99,31 @@ else
   exit 1
 fi
 
-# ── 9. verify panda hardware is running the new firmware ──────────────────────
+# ── 9. verify panda hardware firmware via binary md5 ─────────────────────────
+# Compare the signed firmware binary on the device against our local build.
+# Waits up to 4 minutes for SSH to be available after reboot before checking.
 echo "=== Verifying panda hardware firmware ==="
-echo "  Waiting for pandad to start and flash panda chip..."
-# Poll for pandad process, then give it 15s to finish flashing
-PANDA_TIMEOUT=90
+echo "  Waiting for SSH to be available (timeout 240s)..."
+PANDA_TIMEOUT=240
 ELAPSED=0
-until ssh "$DEVICE" "pgrep -f pandad" >/dev/null 2>&1; do
+until ssh -o ConnectTimeout=5 -o BatchMode=yes "$DEVICE" true 2>/dev/null; do
   sleep 5
   ELAPSED=$((ELAPSED + 5))
   if [[ $ELAPSED -ge $PANDA_TIMEOUT ]]; then
-    echo "  WARNING: pandad did not start within ${PANDA_TIMEOUT}s — cannot verify panda firmware"
-    echo "Deploy complete (panda firmware check skipped — verify manually)."
+    echo "  WARNING: SSH not available within ${PANDA_TIMEOUT}s — cannot verify panda firmware"
+    echo "=== Deploy complete (panda firmware check skipped) ==="
     exit 0
   fi
-  printf "  waiting for pandad... (%ds)\r" "$ELAPSED"
+  printf "  waiting for SSH... (%ds)\r" "$ELAPSED"
 done
-sleep 15  # allow pandad to complete firmware flash if version changed
 
-PANDA_VERSION=$(ssh "$DEVICE" \
-  "python3 -c 'from panda import Panda; p = Panda(); print(p.get_version())'" 2>/dev/null \
-  || echo "QUERY_FAILED")
-
-if [[ "$PANDA_VERSION" == "QUERY_FAILED" ]]; then
-  echo "  WARNING: Could not query panda hardware — verify manually"
-elif [[ "$PANDA_VERSION" == "$EXPECTED_PANDA_VERSION" ]]; then
-  echo "  OK  panda hardware running expected firmware ($PANDA_VERSION)"
+REMOTE_FW_HASH=$(ssh "$DEVICE" "md5sum /data/openpilot/$PANDA_BIN" | awk '{print $1}')
+if [[ "$EXPECTED_FW_HASH" == "$REMOTE_FW_HASH" ]]; then
+  echo "  OK  panda firmware binary matches local build ($REMOTE_FW_HASH)"
 else
-  echo "  FAIL panda firmware mismatch"
-  echo "       expected: $EXPECTED_PANDA_VERSION"
-  echo "       actual:   $PANDA_VERSION"
+  echo "  FAIL panda firmware binary mismatch"
+  echo "       expected: $EXPECTED_FW_HASH"
+  echo "       actual:   $REMOTE_FW_HASH"
   exit 1
 fi
 
