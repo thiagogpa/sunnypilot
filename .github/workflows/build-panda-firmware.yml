@@ -1,0 +1,32 @@
+name: Build panda firmware
+
+on:
+  push:
+    branches: [crosstrek]
+    paths:
+      - 'panda/**'
+      - 'opendbc/safety/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install ARM toolchain
+        run: sudo apt-get install -y gcc-arm-none-eabi
+
+      - name: Build panda firmware
+        run: cd panda && scons
+
+      - name: Commit firmware binary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add panda/board/obj/panda_h7.bin.signed
+          git diff --cached --quiet || (git commit -m "chore: rebuild panda firmware [skip ci]" && git push)
