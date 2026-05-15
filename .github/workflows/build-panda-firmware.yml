@@ -18,11 +18,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install ARM toolchain and scons
-        run: sudo apt-get install -y gcc-arm-none-eabi && pip install scons
+      - name: Install ARM toolchain
+        run: sudo apt-get install -y gcc-arm-none-eabi
+
+      - name: Setup panda build environment
+        run: cd panda && ./setup.sh
 
       - name: Build panda firmware
-        run: cd panda && scons
+        run: cd panda && source .venv/bin/activate && scons
 
       - name: Commit firmware binary
         run: |
