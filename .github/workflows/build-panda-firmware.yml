@@ -1,6 +1,7 @@
 name: Build panda firmware
 
 on:
+  workflow_dispatch:
   push:
     branches: [crosstrek]
     paths:
