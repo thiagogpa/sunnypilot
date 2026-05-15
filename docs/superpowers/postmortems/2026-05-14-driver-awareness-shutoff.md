@@ -19,7 +19,7 @@ Added a `DriverAwarenessShutoff` param (default `True`) that suppresses the full
 
 - Awareness decay happens inside `_update_events`, not `_update_states`. The plan doc said "awareness math in `_update_states` / `_set_policy`" but the step-change subtraction (`self.awareness = max(self.awareness - self.step_change, -0.1)`) is at `helpers.py:378` inside `_update_events`. This is the key structural insight that drove the gate restructure.
 - `test_param_default_is_true`: openpilot's `Params.get_bool` returns `False` for missing keys regardless of the `params_keys.h` declared default. The default is only written to LMDB by manager at first boot. Use `Params.get_default_value(key)` to test compile-time defaults.
-- **Process replay on lain was skipped**: lain is on the Subaru brake hold branch with unrelated changes, so syncing was not safe. Process replay for `dmonitoringd` would show a diff (events list empty under default-True shutoff) — this is expected behavior and should be documented if submitted upstream.
+- **Process replay on lain produces a pre-existing failure**: lain is on the Subaru brake hold branch. Process replay for `dmonitoringd` fails with "0.00% valid messages" even with the original unmodified `dmonitoringd.py` — confirming the failure is caused by lain's branch modifications to `helpers.py` (not our changes). Process replay cannot be used to validate `DriverAwarenessShutoff` on lain without first resolving that branch's dmonitoringd validity issue.
 
 ## Risks left open
 
