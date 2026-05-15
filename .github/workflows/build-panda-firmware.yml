@@ -5,7 +5,7 @@ on:
     branches: [crosstrek]
     paths:
       - 'panda/**'
-      - 'opendbc/safety/**'
+      - 'opendbc_repo/opendbc/safety/**'
 
 permissions:
   contents: write
