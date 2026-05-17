@@ -866,6 +866,132 @@ git commit -m "docs(dm): post-mortem for DriverAwarenessShutoff"
 
 ---
 
+## Task 17: Skip install-time DM training modal when shutoff is enabled (added 2026-05-16)
+
+**Files:**
+- Modify: `system/manager/manager.py` (add `training_version` import; seed `CompletedTrainingVersion` after the default-population loop)
+- Reference: `temp/DRIVER-AWARENESS-RESEARCH.md` §14 for full rationale
+- Touched by user gap report: fresh install still forced through 19-step `TrainingGuide` even with `DriverAwarenessShutoff=True`, because both `system/hardware/hardwared.py:310` and `selfdrive/ui/layouts/onboarding.py:180` gate on `CompletedTrainingVersion == training_version ("0.2.0")` and the param is unset on first boot.
+
+- [x] **Step 1: Add the import**
+
+In `system/manager/manager.py`, replace:
+
+```python
+from openpilot.system.version import get_build_metadata
+```
+
+with:
+
+```python
+from openpilot.system.version import get_build_metadata, training_version
+```
+
+- [x] **Step 2: Add the seed AFTER the default-population loop**
+
+Place after the `for k in params.all_keys(): ... params.put(k, default_value)` block (currently around line 61 in `manager_init()`):
+
+```python
+# Skip install-time DM training modal when DriverAwarenessShutoff is enabled,
+# otherwise hardwared.py blocks onroad on completed_training and the UI blocks home on the modal.
+if params.get_bool("DriverAwarenessShutoff") and params.get("CompletedTrainingVersion") != training_version:
+  params.put("CompletedTrainingVersion", training_version)
+```
+
+**Why after the default loop and not next to `RecordFrontLock` at line 51-52:** `Params.get_bool` returns `False` for unset keys regardless of the declared default in `params_keys.h` (see post-mortem dated 2026-05-14 under "Surprises / non-obvious findings"). The default loop is what writes `"1"` to `DriverAwarenessShutoff` on first boot. The seed must run after it, or it will silently no-op on fresh installs — the exact bug being fixed.
+
+- [x] **Step 3: Lint**
+
+```bash
+source .venv/bin/activate
+ruff check system/manager/manager.py
+ty check system/manager/manager.py
+```
+
+Note: `ruff format --check` may flag pre-existing format issues elsewhere in `manager.py`; do not reformat unrelated lines.
+
+- [ ] **Step 4: Manual verification on dev machine**
+
+```bash
+source .venv/bin/activate
+python -c "
+from openpilot.common.params import Params
+from openpilot.system.version import training_version
+
+# Simulate first-boot path
+p = Params()
+p.put_bool('DriverAwarenessShutoff', True)
+p.remove('CompletedTrainingVersion')
+
+# Mimic what manager_init does after the default-population loop
+if p.get_bool('DriverAwarenessShutoff') and p.get('CompletedTrainingVersion') != training_version:
+  p.put('CompletedTrainingVersion', training_version)
+
+assert p.get('CompletedTrainingVersion') == training_version, f'seed failed: {p.get(\"CompletedTrainingVersion\")}'
+print('seed OK:', p.get('CompletedTrainingVersion'))
+
+# Negative case
+p.put_bool('DriverAwarenessShutoff', False)
+p.remove('CompletedTrainingVersion')
+if p.get_bool('DriverAwarenessShutoff') and p.get('CompletedTrainingVersion') != training_version:
+  p.put('CompletedTrainingVersion', training_version)
+assert p.get('CompletedTrainingVersion') is None, 'must not seed when shutoff off'
+print('negative case OK: CompletedTrainingVersion stayed unset')
+
+# Restore default
+p.put_bool('DriverAwarenessShutoff', True)
+"
+```
+
+Expected: both prints succeed, no assertion errors.
+
+- [ ] **Step 5: On-device verification (after deploy)**
+
+Pre-deploy: verify `system/manager/manager.py` is covered by the rsync includes in `scripts/deploy_dm_shutoff.sh` (`.py` is covered).
+
+```bash
+./scripts/deploy_dm_shutoff.sh
+```
+
+After reboot:
+
+```bash
+# Confirm seed fired
+ssh comma@comma.internal "cat /data/params/d/CompletedTrainingVersion"
+# Expected: 0.2.0
+
+# Confirm RecordFront was NOT auto-enabled (privacy default preserved)
+ssh comma@comma.internal "cat /data/params/d/RecordFront 2>/dev/null || echo missing"
+# Expected: 0 or missing
+
+# Confirm device entered onroad (no training-gate block)
+ssh comma@comma.internal "cat /data/params/d/IsOnroad 2>/dev/null"
+# Should report 1 once ignition is on
+```
+
+- [ ] **Step 6: Negative on-device check — flip shutoff False, ensure training modal returns**
+
+```bash
+ssh comma@comma.internal "echo -n 0 > /data/params/d/DriverAwarenessShutoff && rm -f /data/params/d/CompletedTrainingVersion && echo -n 1 > /data/params/d/DoReboot"
+```
+
+After reboot, the UI must show the full 19-step `TrainingGuide` modal — confirming we did not damage the upstream onboarding flow, only skip it when the user opted in via `DriverAwarenessShutoff=True`.
+
+Re-enable shutoff afterwards:
+
+```bash
+ssh comma@comma.internal "echo -n 1 > /data/params/d/DriverAwarenessShutoff && echo -n 1 > /data/params/d/DoReboot"
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add system/manager/manager.py temp/DRIVER-AWARENESS-RESEARCH.md docs/superpowers/plans/2026-05-14-driver-awareness-shutoff.md docs/superpowers/postmortems/2026-05-14-driver-awareness-shutoff.md
+git commit -m "feat(dm): skip install-time training modal when DriverAwarenessShutoff is true"
+```
+
+---
+
 ## QA Scenario Coverage Matrix
 
 | QA scenario | Covered by task |
@@ -888,6 +1014,8 @@ git commit -m "docs(dm): post-mortem for DriverAwarenessShutoff"
 | #16 Terminal counter contract pinned | Task 4 (counter never triggers write under shutoff) |
 | #17 Multiprocess param visibility | Task 15 Step 7 (manual flip + reboot) |
 | #18 Param type coercion / default | Task 13 |
+| #19 Install-time training modal skipped under shutoff | Task 17 |
+| #20 Training modal returns when shutoff is False | Task 17 Step 6 |
 
 ---
 

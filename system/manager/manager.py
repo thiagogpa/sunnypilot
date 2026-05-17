@@ -18,7 +18,7 @@ from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes
 from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_ID
 from openpilot.common.swaglog import cloudlog, add_file_handler
-from openpilot.system.version import get_build_metadata
+from openpilot.system.version import get_build_metadata, training_version
 from openpilot.system.hardware.hw import Paths
 from openpilot.system.hardware import PC
 
@@ -59,6 +59,11 @@ def manager_init() -> None:
     default_value = params.get_default_value(k)
     if default_value is not None and params.get(k) is None:
       params.put(k, default_value)
+
+  # Skip install-time DM training modal when DriverAwarenessShutoff is enabled,
+  # otherwise hardwared.py blocks onroad on completed_training and the UI blocks home on the modal.
+  if params.get_bool("DriverAwarenessShutoff") and params.get("CompletedTrainingVersion") != training_version:
+    params.put("CompletedTrainingVersion", training_version)
 
   # Create folders needed for msgq
   try:
