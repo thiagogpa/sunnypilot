@@ -15,6 +15,10 @@
     "title": "Always-on Driver Monitor",
     "description": ""
   },
+  "DriverAwarenessShutoff": {
+    "title": "Driver Awareness Shutoff",
+    "description": "Disable driver monitoring nagging and engagement lockout."
+  },
   "ApiCache_Device": {
     "title": "Api Cache  Device",
     "description": ""
