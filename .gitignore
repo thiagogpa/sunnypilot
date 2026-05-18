@@ -1,3 +1,4 @@
+COMPILE.md
 venv/
 .venv/
 .ci_cache
@@ -84,14 +85,25 @@ build/
 !.vscode/*.code-snippets
 
 # agents
+.agents/
 .claude/
+.gemini/
 .context/
 PLAN.md
 TASK.md
 CLAUDE.md
 SKILL.md
+GEMINI.md
+
+# local session files
+run_all_tests_summary.py
+skills-lock.json
+tools/test_results/
+docs/superpowers/
+temp/
 
 ### JetBrains ###
 !.idea/customTargets.xml
 !.idea/tools/*
 !.run/*
+logs/

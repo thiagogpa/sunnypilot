@@ -136,7 +136,7 @@ def face_orientation_from_net(angles_desc, pos_desc, rpy_calib):
 
 
 class DriverMonitoring:
-  def __init__(self, rhd_saved=False, settings=None, always_on=False):
+  def __init__(self, rhd_saved=False, settings=None, always_on=False, awareness_shutoff=False):
     # init policy settings
     self.settings = settings if settings is not None else DRIVER_MONITOR_SETTINGS(device_type=HARDWARE.get_device_type())
 
@@ -148,6 +148,7 @@ class DriverMonitoring:
     self.phone_prob = 0.
 
     self.always_on = always_on
+    self.awareness_shutoff = awareness_shutoff
     self.distracted_types = []
     self.driver_distracted = False
     self.driver_distraction_filter = FirstOrderFilter(0., self.settings._DISTRACTED_FILTER_TS, self.settings._DT_DMON)
@@ -326,16 +327,18 @@ class DriverMonitoring:
 
   def _update_events(self, driver_engaged, op_engaged, standstill, wrong_gear, car_speed):
     self._reset_events()
-    # Block engaging until ignition cycle after max number or time of distractions
-    if self.terminal_alert_cnt >= self.settings._MAX_TERMINAL_ALERTS or \
-       self.terminal_time >= self.settings._MAX_TERMINAL_DURATION:
-      if not self.too_distracted:
-        self.params.put_bool_nonblocking("DriverTooDistracted", True)
-      self.too_distracted = True
 
-    # Always-on distraction lockout is temporary
-    if self.too_distracted or (self.always_on and self.awareness <= self.threshold_prompt):
-      self.current_events.add(EventName.tooDistracted)
+    if not self.awareness_shutoff:
+      # Block engaging until ignition cycle after max number or time of distractions
+      if self.terminal_alert_cnt >= self.settings._MAX_TERMINAL_ALERTS or \
+         self.terminal_time >= self.settings._MAX_TERMINAL_DURATION:
+        if not self.too_distracted:
+          self.params.put_bool_nonblocking("DriverTooDistracted", True)
+        self.too_distracted = True
+
+      # Always-on distraction lockout is temporary
+      if self.too_distracted or (self.always_on and self.awareness <= self.threshold_prompt):
+        self.current_events.add(EventName.tooDistracted)
 
     always_on_valid = self.always_on and not wrong_gear
     if (driver_engaged and self.awareness > 0 and not self.active_monitoring_mode) or \
@@ -373,6 +376,9 @@ class DriverMonitoring:
       # also will not be reaching 0 if DM is active when not engaged
       if not (standstill_orange_exemption or always_on_red_exemption):
         self.awareness = max(self.awareness - self.step_change, -0.1)
+
+    if self.awareness_shutoff:
+      return
 
     alert = None
     if self.awareness <= 0.:

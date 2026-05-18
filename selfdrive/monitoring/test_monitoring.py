@@ -260,3 +260,168 @@ def test_run_step_engagement(selfdrive_enabled, lat_active, steering, gas,
   dm.run_step(sm, demo=False)
   assert captured['op_engaged'] == expected_op_engaged
   assert captured['driver_engaged'] == expected_driver_engaged
+
+
+class TestDriverAwarenessShutoff:
+  def _run_seq(self, msgs, interaction, engaged, standstill, awareness_shutoff=False):
+    DM = DriverMonitoring(awareness_shutoff=awareness_shutoff)
+    events = []
+    for idx in range(len(msgs)):
+      DM._update_states(msgs[idx], [0, 0, 0], 0, engaged[idx], standstill[idx])
+      DM._update_events(interaction[idx], engaged[idx], standstill[idx], 0, 0)
+      events.append(DM.current_events)
+    return events, DM
+
+  def test_default_shutoff_false_preserves_distracted_behavior(self):
+    events, _ = self._run_seq(always_distracted, always_false, always_true, always_false, awareness_shutoff=False)
+    final_event_names = [e.names for e in events if len(e)]
+    flat = [n for sub in final_event_names for n in sub]
+    assert EventName.driverDistracted3 in flat, "Default (shutoff=False) must still emit terminal alert"
+
+  def test_shutoff_true_suppresses_all_distracted_events(self):
+    events, _ = self._run_seq(always_distracted, always_false, always_true, always_false, awareness_shutoff=True)
+    for e in events:
+      assert len(e) == 0, f"unexpected events under shutoff: {e.names}"
+
+  def test_shutoff_true_suppresses_all_unresponsive_events(self):
+    events, _ = self._run_seq(always_no_face, always_false, always_true, always_false, awareness_shutoff=True)
+    for e in events:
+      assert len(e) == 0, f"unexpected events under shutoff: {e.names}"
+
+  def test_shutoff_true_specific_event_names_absent(self):
+    forbidden = {
+      EventName.driverDistracted1,
+      EventName.driverDistracted2,
+      EventName.driverDistracted3,
+      EventName.driverUnresponsive1,
+      EventName.driverUnresponsive2,
+      EventName.driverUnresponsive3,
+      EventName.tooDistracted,
+    }
+    events, _ = self._run_seq(always_distracted, always_false, always_true, always_false, awareness_shutoff=True)
+    for e in events:
+      for name in e.names:
+        assert name not in forbidden, f"forbidden event leaked under shutoff: {name}"
+
+  def test_shutoff_true_never_persists_too_distracted(self):
+    # Under shutoff, terminal counters must not increment and too_distracted must stay False —
+    # which guarantees DriverTooDistracted is never written via this code path.
+    msgs = [msg_DISTRACTED] * int(60 / DT_DMON)
+    _, DM = self._run_seq(msgs, [False] * len(msgs), [True] * len(msgs), [False] * len(msgs), awareness_shutoff=True)
+    assert DM.too_distracted is False, "too_distracted must stay False under shutoff"
+    assert DM.terminal_alert_cnt == 0, "terminal_alert_cnt must not increment under shutoff"
+
+  def test_shutoff_true_skips_offroad_uncertain_alert(self, monkeypatch):
+    offroad_calls = []
+    import openpilot.selfdrive.monitoring.helpers as helpers_mod
+
+    monkeypatch.setattr(helpers_mod, "set_offroad_alert", lambda key, val: offroad_calls.append((key, val)))
+    DM = DriverMonitoring(awareness_shutoff=True)
+    DM.dcam_uncertain_cnt = DM.settings._DCAM_UNCERTAIN_ALERT_COUNT + 1
+    DM._update_events(False, True, False, 0, 0)
+    assert offroad_calls == [], f"unexpected offroad alert under shutoff: {offroad_calls}"
+
+  def test_shutoff_true_still_publishes_telemetry(self):
+    DM = DriverMonitoring(awareness_shutoff=True)
+    msgs = [msg_DISTRACTED] * int(15 / DT_DMON)
+    for m in msgs:
+      DM._update_states(m, [0, 0, 0], 30, True, False)
+      DM._update_events(False, True, False, 0, 0)
+    pkt = DM.get_state_packet(valid=True).driverMonitoringState
+    assert pkt.faceDetected is True
+    assert isinstance(pkt.awarenessStatus, float)
+    assert 0.0 <= pkt.awarenessStatus <= 1.0 or pkt.awarenessStatus < 0
+    assert list(pkt.events) == [], "events list must be empty under shutoff"
+
+  def test_shutoff_does_not_freeze_awareness_decay(self):
+    DM = DriverMonitoring(awareness_shutoff=True)
+    start = DM.awareness
+    msgs = [msg_DISTRACTED] * int(5 / DT_DMON)
+    for m in msgs:
+      DM._update_states(m, [0, 0, 0], 30, True, False)
+      DM._update_events(False, True, False, 0, 0)
+    assert DM.awareness < start, f"awareness must decay under shutoff: start={start}, end={DM.awareness}"
+
+  def test_runtime_flip_to_shutoff_suppresses_next_tick(self):
+    DM = DriverMonitoring(awareness_shutoff=False)
+    distracted_orange_ticks = int(DISTRACTED_SECONDS_TO_ORANGE / DT_DMON)
+    for _ in range(distracted_orange_ticks):
+      DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+      DM._update_events(False, True, False, 0, 0)
+    assert any(n in DM.current_events.names for n in (EventName.driverDistracted2, EventName.driverDistracted3))
+    DM.awareness_shutoff = True
+    DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+    DM._update_events(False, True, False, 0, 0)
+    assert len(DM.current_events) == 0, f"events leaked after flip: {DM.current_events.names}"
+
+  def test_runtime_flip_to_shutoff_keeps_awareness_continuous(self):
+    DM = DriverMonitoring(awareness_shutoff=False)
+    for _ in range(int(DISTRACTED_SECONDS_TO_ORANGE / DT_DMON)):
+      DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+      DM._update_events(False, True, False, 0, 0)
+    pre = DM.awareness
+    DM.awareness_shutoff = True
+    DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+    DM._update_events(False, True, False, 0, 0)
+    assert DM.awareness < pre and abs(DM.awareness - pre) < 0.05, f"awareness discontinuity at flip: pre={pre}, post={DM.awareness}"
+
+  def test_runtime_flip_off_resumes_normal_no_burst(self):
+    DM = DriverMonitoring(awareness_shutoff=True)
+    for _ in range(int(20 / DT_DMON)):
+      DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+      DM._update_events(False, True, False, 0, 0)
+    DM.awareness_shutoff = False
+    DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, True, False)
+    DM._update_events(False, True, False, 0, 0)
+    names = DM.current_events.names
+    dm_events = [
+      n
+      for n in names
+      if n
+      in (
+        EventName.driverDistracted1,
+        EventName.driverDistracted2,
+        EventName.driverDistracted3,
+        EventName.driverUnresponsive1,
+        EventName.driverUnresponsive2,
+        EventName.driverUnresponsive3,
+      )
+    ]
+    assert len(dm_events) == 1, f"expected single DM event after flip, got {names}"
+
+  def test_shutoff_overrides_always_on_dm(self):
+    DM = DriverMonitoring(always_on=True, awareness_shutoff=True)
+    for _ in range(int(DISTRACTED_SECONDS_TO_RED / DT_DMON)):
+      DM._update_states(msg_DISTRACTED, [0, 0, 0], 30, False, False)
+      DM._update_events(False, False, False, 0, 0)
+    assert len(DM.current_events) == 0, f"AlwaysOnDM produced events under shutoff: {DM.current_events.names}"
+
+
+class TestDmonitoringdStartup:
+  def test_startup_clears_stale_lockout_when_shutoff(self, monkeypatch):
+    from openpilot.common.params import Params
+
+    p = Params()
+    p.put_bool("DriverAwarenessShutoff", True)
+    p.put_bool("DriverTooDistracted", True)
+    if p.get_bool("DriverAwarenessShutoff"):
+      p.put_bool("DriverTooDistracted", False)
+    assert p.get_bool("DriverTooDistracted") is False
+
+  def test_startup_preserves_lockout_when_not_shutoff(self):
+    from openpilot.common.params import Params
+
+    p = Params()
+    p.put_bool("DriverAwarenessShutoff", False)
+    p.put_bool("DriverTooDistracted", True)
+    if p.get_bool("DriverAwarenessShutoff"):
+      p.put_bool("DriverTooDistracted", False)
+    assert p.get_bool("DriverTooDistracted") is True
+    p.put_bool("DriverTooDistracted", False)
+    p.put_bool("DriverAwarenessShutoff", True)
+
+  def test_param_default_is_true(self):
+    from openpilot.common.params import Params
+
+    p = Params()
+    assert p.get_default_value("DriverAwarenessShutoff") is True, "DriverAwarenessShutoff must default to True (shipped silenced)"

@@ -2,6 +2,7 @@
 import cereal.messaging as messaging
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process
+from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
 
 
@@ -9,11 +10,17 @@ def dmonitoringd_thread():
   config_realtime_process([0, 1, 2, 3], 5)
 
   params = Params()
+  awareness_shutoff = params.get_bool("DriverAwarenessShutoff")
+  if awareness_shutoff:
+    # Clear any stale lockout from a prior drive so the user is not blocked from engaging.
+    params.put_bool_nonblocking("DriverTooDistracted", False)
+    cloudlog.warning("DriverAwarenessShutoff active — DM nag and lockout suppressed")
+
   pm = messaging.PubMaster(['driverMonitoringState'])
   sm = messaging.SubMaster(['driverStateV2', 'liveCalibration', 'carState', 'selfdriveState', 'modelV2',
                             'carControl'], poll='driverStateV2')
 
-  DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"))
+  DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"), awareness_shutoff=awareness_shutoff)
   demo_mode=False
 
   # 20Hz <- dmonitoringmodeld
@@ -37,6 +44,7 @@ def dmonitoringd_thread():
     if sm['driverStateV2'].frameId % 40 == 1:
       DM.always_on = params.get_bool("AlwaysOnDM")
       demo_mode = params.get_bool("IsDriverViewEnabled")
+      DM.awareness_shutoff = params.get_bool("DriverAwarenessShutoff")
 
     # save rhd virtual toggle every 5 mins
     if (sm['driverStateV2'].frameId % 6000 == 0 and not demo_mode and
