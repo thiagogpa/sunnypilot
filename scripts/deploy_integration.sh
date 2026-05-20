@@ -16,7 +16,7 @@
 #  12. Post-reboot verification: firmware md5 + DM params + dmonitoringd
 set -euo pipefail
 
-REPO=/Users/thiago/Documents/dev/sunnypilot
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEVICE=comma@comma.internal
 PANDA_BIN=panda/board/obj/panda_h7.bin.signed
 
