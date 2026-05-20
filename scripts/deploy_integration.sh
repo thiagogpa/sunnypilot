@@ -26,6 +26,7 @@ VERIFY_FILES=(
   "$PANDA_BIN"
   "opendbc_repo/opendbc/car/subaru/carcontroller.py"
   "opendbc_repo/opendbc/car/subaru/carstate.py"
+  "opendbc_repo/opendbc/car/subaru/subarucan.py"
   "opendbc_repo/opendbc/safety/modes/subaru.h"
   "opendbc_repo/opendbc/sunnypilot/car/subaru/brake_hold.py"
   "opendbc_repo/opendbc/sunnypilot/car/subaru/subarucan_ext.py"
