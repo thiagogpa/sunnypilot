@@ -69,7 +69,10 @@ fi
 echo "  DisableUpdates=1 (OK)"
 
 # ── 1. venv ───────────────────────────────────────────────────────────────────
-source .venv/bin/activate
+# Use absolute paths instead of `source .venv/bin/activate`: the activate script
+# bakes in VIRTUAL_ENV at creation time, which breaks if the repo is moved.
+export VIRTUAL_ENV="$REPO/.venv"
+export PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # ── 2. build panda firmware ───────────────────────────────────────────────────
 echo "=== Building panda firmware ==="
