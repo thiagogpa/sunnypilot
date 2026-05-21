@@ -10,7 +10,7 @@
 #   6. Rebuild params_pyx.so on device (needed for DriverAwarenessShutoff key)
 #   7. Smoke-test new .so before swapping
 #   8. Atomic swap of params_pyx.so
-#   9. Set DriverAwarenessShutoff=1 and overlay-swap guards
+#   9. Set DriverAwarenessShutoff=1, SubaruAutoVehicleHold=1, overlay-swap guards
 #  10. Pre-reboot import + read check
 #  11. Single reboot
 #  12. Post-reboot verification: firmware md5 + DM params + dmonitoringd
@@ -179,6 +179,7 @@ from openpilot.common.params import Params
 p = Params()
 val = p.get_default_value('DriverAwarenessShutoff')
 assert val is True, f'Expected True default, got {val!r}'
+_ = p.get_default_value('SubaruAutoVehicleHold')  # new fork key must be compiled into rebuilt .so
 _ = p.get_default_value('DongleId')
 p.put_bool('DisableUpdates', True)
 actual_path = '/data/params/d/DisableUpdates'
@@ -210,8 +211,10 @@ from openpilot.common.params import Params
 p = Params()
 p.put_bool('DriverAwarenessShutoff', True)
 p.put_bool('DisableUpdates', True)
+p.put_bool('SubaruAutoVehicleHold', True)
 print('  DriverAwarenessShutoff=True')
 print('  DisableUpdates=True')
+print('  SubaruAutoVehicleHold=True')
 \"
 rm -f /data/openpilot/.overlay_init
 rm -rf /data/safe_staging/finalized
@@ -281,14 +284,17 @@ ssh "$DEVICE" "
 set -e
 echo '  DisableUpdates:' \$(cat /data/params/d/DisableUpdates 2>/dev/null || echo MISSING)
 echo '  DriverAwarenessShutoff:' \$(cat /data/params/d/DriverAwarenessShutoff 2>/dev/null || echo MISSING)
+echo '  SubaruAutoVehicleHold:' \$(cat /data/params/d/SubaruAutoVehicleHold 2>/dev/null || echo MISSING)
 cd /data/openpilot
 PYTHONPATH=/data /usr/local/venv/bin/python3 -c \"
 from openpilot.common.params import Params
 p = Params()
 assert p.get_bool('DriverAwarenessShutoff') is True, 'DriverAwarenessShutoff not True post-reboot'
 assert p.get_bool('DisableUpdates') is True, 'DisableUpdates not True post-reboot'
+assert p.get_bool('SubaruAutoVehicleHold') is True, 'SubaruAutoVehicleHold not True post-reboot'
 print('  runtime get_bool DriverAwarenessShutoff: True (OK)')
 print('  runtime get_bool DisableUpdates: True (OK)')
+print('  runtime get_bool SubaruAutoVehicleHold: True (OK)')
 from openpilot.selfdrive.monitoring.dmonitoringd import dmonitoringd_thread
 from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
 from opendbc.car.subaru.carcontroller import CarController
