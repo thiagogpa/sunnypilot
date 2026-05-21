@@ -28,7 +28,6 @@ VERIFY_FILES=(
   "opendbc_repo/opendbc/car/subaru/carstate.py"
   "opendbc_repo/opendbc/car/subaru/subarucan.py"
   "opendbc_repo/opendbc/safety/modes/subaru.h"
-  "opendbc_repo/opendbc/sunnypilot/car/subaru/brake_hold.py"
   "opendbc_repo/opendbc/sunnypilot/car/subaru/subarucan_ext.py"
   "opendbc_repo/opendbc/sunnypilot/car/subaru/values_ext.py"
   "opendbc_repo/opendbc/sunnypilot/car/interfaces.py"
@@ -229,9 +228,10 @@ print('  DriverAwarenessShutoff runtime:', p.get_bool('DriverAwarenessShutoff'))
 print('  DisableUpdates:', p.get_bool('DisableUpdates'))
 from openpilot.selfdrive.monitoring.dmonitoringd import dmonitoringd_thread
 from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
-from opendbc.sunnypilot.car.subaru.brake_hold import BrakeHoldController
+from opendbc.car.subaru.carcontroller import CarController
+from opendbc.car.subaru.subarucan import create_es_brake_hold
 print('  dmonitoringd + helpers import: OK')
-print('  BrakeHoldController import: OK')
+print('  Subaru AVH brake-hold imports: OK')
 \""
 
 # ── 11. reboot ────────────────────────────────────────────────────────────────
@@ -291,9 +291,10 @@ print('  runtime get_bool DriverAwarenessShutoff: True (OK)')
 print('  runtime get_bool DisableUpdates: True (OK)')
 from openpilot.selfdrive.monitoring.dmonitoringd import dmonitoringd_thread
 from openpilot.selfdrive.monitoring.helpers import DriverMonitoring
-from opendbc.sunnypilot.car.subaru.brake_hold import BrakeHoldController
+from opendbc.car.subaru.carcontroller import CarController
+from opendbc.car.subaru.subarucan import create_es_brake_hold
 print('  dmonitoringd + helpers import: OK')
-print('  BrakeHoldController import: OK')
+print('  Subaru AVH brake-hold imports: OK')
 \"
 sleep 3
 if pgrep -af 'selfdrive.monitoring.dmonitoringd' >/dev/null; then
