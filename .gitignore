@@ -89,6 +89,7 @@ build/
 .claude/
 .gemini/
 .context/
+.antigravitycli/
 PLAN.md
 TASK.md
 CLAUDE.md
