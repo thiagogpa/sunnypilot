@@ -83,7 +83,7 @@ cd "$REPO"
 
 # ── 3. run Subaru brake-hold safety tests ─────────────────────────────────────
 echo "=== Running Subaru brake-hold safety tests ==="
-python -m pytest opendbc_repo/opendbc/safety/tests/test_subaru_brake_hold.py -q
+python -m unittest opendbc_repo.opendbc.safety.tests.test_subaru_brake_hold -v
 
 # ── 4. rsync sources to device (DM-style excludes — most thorough) ────────────
 echo "=== Syncing sources to device ==="
